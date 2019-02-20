@@ -23,6 +23,8 @@ public class SunsetFragment extends Fragment {
     private int mSunsetSkyColor;
     private int mNightSkyColor;
 
+    private boolean mIsSunDown = false;
+
     @Nullable
     @Override
     public View onCreateView(
@@ -35,7 +37,11 @@ public class SunsetFragment extends Fragment {
         mSceneView.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                startAnimation();
+                if (mIsSunDown) {
+                    setSunUp();
+                } else {
+                    setSunDown();
+                }
             }
         });
         mSunView = view.findViewById(R.id.sun);
@@ -50,7 +56,31 @@ public class SunsetFragment extends Fragment {
         return view;
     }
 
-    private void startAnimation() {
+    private void setSunUp() {
+        float sunYStart = mSunView.getTop();
+        float sunYEnd = mSkyView.getHeight();
+        ObjectAnimator heightAnimator = ObjectAnimator
+                .ofFloat(mSunView, "y", sunYEnd, sunYStart)
+                .setDuration(3000);
+        heightAnimator.setInterpolator(new AccelerateInterpolator(1));
+        ObjectAnimator sunsetSkyAnimator = ObjectAnimator
+                .ofInt(mSkyView, "backgroundColor", mSunsetSkyColor, mBlueSkyColor)
+                .setDuration(3000);
+        sunsetSkyAnimator.setEvaluator(new ArgbEvaluator());
+        ObjectAnimator nightSkyAnimator = ObjectAnimator
+                .ofInt(mSkyView, "backgroundColor", mNightSkyColor, mSunsetSkyColor)
+                .setDuration(1500);
+        nightSkyAnimator.setEvaluator(new ArgbEvaluator());
+        AnimatorSet animatorSet = new AnimatorSet();
+        animatorSet
+                .play(nightSkyAnimator)
+                .before(sunsetSkyAnimator)
+                .before(heightAnimator);
+        animatorSet.start();
+        mIsSunDown = false;
+    }
+
+    private void setSunDown() {
         float sunYStart = mSunView.getTop();
         float sunYEnd = mSkyView.getHeight();
         ObjectAnimator heightAnimator = ObjectAnimator
@@ -71,6 +101,7 @@ public class SunsetFragment extends Fragment {
                 .with(sunsetSkyAnimator)
                 .before(nightSkyAnimator);
         animatorSet.start();
+        mIsSunDown = true;
     }
 
     public static SunsetFragment newInstance() {
