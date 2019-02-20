@@ -1,13 +1,16 @@
 package com.andreimironov.sunset;
 
+import android.animation.Animator;
 import android.animation.AnimatorSet;
 import android.animation.ArgbEvaluator;
 import android.animation.ObjectAnimator;
+import android.animation.ValueAnimator;
 import android.content.res.Resources;
 import android.os.Bundle;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
+import android.view.ViewTreeObserver;
 import android.view.animation.AccelerateInterpolator;
 
 import androidx.annotation.NonNull;
@@ -24,6 +27,10 @@ public class SunsetFragment extends Fragment {
     private int mNightSkyColor;
 
     private boolean mIsSunDown = false;
+
+    private ValueAnimator mWidthAnimator;
+    private ValueAnimator mHeightAnimator;
+    private AnimatorSet mPulsateAnimatorSet;
 
     @Nullable
     @Override
@@ -52,15 +59,50 @@ public class SunsetFragment extends Fragment {
         mBlueSkyColor = resources.getColor(R.color.blue_sky);
         mSunsetSkyColor = resources.getColor(R.color.sunset_sky);
         mNightSkyColor = resources.getColor(R.color.night_sky);
-
+        mSunView.getViewTreeObserver().addOnGlobalLayoutListener(new ViewTreeObserver.OnGlobalLayoutListener() {
+            @Override
+            public void onGlobalLayout() {
+                mSunView.getViewTreeObserver().removeOnGlobalLayoutListener(this);
+                mHeightAnimator = ValueAnimator
+                        .ofInt(mSunView.getMeasuredHeight(), mSunView.getMeasuredHeight() * 2);
+                mHeightAnimator.addUpdateListener(new ValueAnimator.AnimatorUpdateListener() {
+                    @Override
+                    public void onAnimationUpdate(ValueAnimator animation) {
+                        int value = (int) animation.getAnimatedValue();
+                        ViewGroup.LayoutParams params = mSunView.getLayoutParams();
+                        params.height = value;
+                        mSunView.setLayoutParams(params);
+                    }
+                });
+                mHeightAnimator.setDuration(1000);
+                mHeightAnimator.setRepeatCount(ValueAnimator.INFINITE);
+                mWidthAnimator = ValueAnimator
+                        .ofInt(mSunView.getMeasuredWidth(), mSunView.getMeasuredWidth() * 2);
+                mWidthAnimator.addUpdateListener(new ValueAnimator.AnimatorUpdateListener() {
+                    @Override
+                    public void onAnimationUpdate(ValueAnimator animation) {
+                        int value = (int) animation.getAnimatedValue();
+                        ViewGroup.LayoutParams params = mSunView.getLayoutParams();
+                        params.width = value;
+                        mSunView.setLayoutParams(params);
+                    }
+                });
+                mWidthAnimator.setDuration(1000);
+                mWidthAnimator.setRepeatCount(ValueAnimator.INFINITE);
+                mPulsateAnimatorSet = new AnimatorSet();
+                mPulsateAnimatorSet
+                        .play(mHeightAnimator)
+                        .with(mWidthAnimator);
+                mPulsateAnimatorSet.start();
+            }
+        });
         return view;
     }
 
     private void setSunUp() {
-        float sunYStart = mSunView.getTop();
-        float sunYEnd = mSkyView.getHeight();
+        mIsSunDown = false;
         ObjectAnimator heightAnimator = ObjectAnimator
-                .ofFloat(mSunView, "y", sunYEnd, sunYStart)
+                .ofFloat(mSunView, "y", mSkyView.getHeight(), mSunView.getTop())
                 .setDuration(3000);
         heightAnimator.setInterpolator(new AccelerateInterpolator(1));
         ObjectAnimator sunsetSkyAnimator = ObjectAnimator
@@ -77,14 +119,34 @@ public class SunsetFragment extends Fragment {
                 .before(sunsetSkyAnimator)
                 .before(heightAnimator);
         animatorSet.start();
-        mIsSunDown = false;
+        animatorSet.addListener(new Animator.AnimatorListener() {
+            @Override
+            public void onAnimationStart(Animator animation) {
+
+            }
+
+            @Override
+            public void onAnimationEnd(Animator animation) {
+                mPulsateAnimatorSet.start();
+            }
+
+            @Override
+            public void onAnimationCancel(Animator animation) {
+
+            }
+
+            @Override
+            public void onAnimationRepeat(Animator animation) {
+
+            }
+        });
     }
 
     private void setSunDown() {
-        float sunYStart = mSunView.getTop();
-        float sunYEnd = mSkyView.getHeight();
+        mIsSunDown = true;
+        mPulsateAnimatorSet.cancel();
         ObjectAnimator heightAnimator = ObjectAnimator
-                .ofFloat(mSunView, "y", sunYStart, sunYEnd)
+                .ofFloat(mSunView, "y", mSunView.getTop(), mSkyView.getHeight())
                 .setDuration(3000);
         heightAnimator.setInterpolator(new AccelerateInterpolator(1));
         ObjectAnimator sunsetSkyAnimator = ObjectAnimator
@@ -101,7 +163,6 @@ public class SunsetFragment extends Fragment {
                 .with(sunsetSkyAnimator)
                 .before(nightSkyAnimator);
         animatorSet.start();
-        mIsSunDown = true;
     }
 
     public static SunsetFragment newInstance() {
